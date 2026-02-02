@@ -50,7 +50,7 @@ int main() {
 				0.0362,
 				0.3726,
 				{{0.25, 0.0301}, {0.25, 0.2795}},
-				0.215,
+				0.265,
 				280,
 				step_size);
 			auto end = std::chrono::high_resolution_clock::now();
@@ -73,7 +73,7 @@ int main() {
 				0.0362,
 				0.3726,
 				{{0.25, 0.0301}, {0.25, 0.2795}},
-				0.215,
+				0.265,
 				280,
 				step_size);
 			auto end = std::chrono::high_resolution_clock::now();
