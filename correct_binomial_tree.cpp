@@ -9,12 +9,7 @@
 using namespace std;
 
 namespace dividends {
-	class Dividend {
-	public:
-		Dividend(double _amount, double _timeToExDiv) : amount(_amount), timeToExDiv(_timeToExDiv) { }
-		double getAmount() { return this->amount; }
-		double getTimeToExDiv() {return this->timeToExDiv; }
-	private:
+	struct Dividend {
 		double amount;
 		double timeToExDiv;
 	};
@@ -28,12 +23,12 @@ namespace binomial_tree {
 	enum OptionStyle {EUROPEAN, AMERICAN};
 
 	double computeValue(
-		const CallPut& callPut, 
-		const OptionStyle& optionStyle, 
-		const double& initialUnderlyingPrice, 
-		const double& continuousRate, 
-		const double& timeToExpiry, 
-		vector<Dividend*> *const dividends, 
+		const CallPut& callPut,
+		const OptionStyle& optionStyle,
+		const double& initialUnderlyingPrice,
+		const double& continuousRate,
+		const double& timeToExpiry,
+		const vector<Dividend> dividends,
 		const double& volatility,
 		double strikePrice,
 		long n /* steps */) {
@@ -46,9 +41,6 @@ namespace binomial_tree {
 				throw "must be European or American!";
 			}
 
-			
-
-
 			double deltaT = timeToExpiry / (.0 + n);
 			double u = exp(volatility * sqrt(deltaT));
 			double d = 1 / u;
@@ -56,56 +48,40 @@ namespace binomial_tree {
 			double a = exp(continuousRate * deltaT) ; // growth rate at each step (i.e. 1 / discount factor)
 			double pu = (a - d) / (u - d);
 			double pd = 1 - pu;
-			
 
-			
-			
 			double* const s = new double[n + 1];	// The tree leaves of the underlying (with dividend excluded)
-			double* const o = new double[n + 1];	// option values 
-			
+			double* const o = new double[n + 1];	// option values
+
 			//
-			// Forward process 
+			// Forward process
 			// For simplicity, we just compute the stock prices at the leaves of the tree
 			// I.e., no intermediate levels of the tree is kept.
-			//  
-			// 
-			// 
-			//                                         s[0] 
-			//                       s[0]           
-			//    s[0]   ---->               ---->     s[1] 
-			//                       s[1]           
-			//                                         s[2] 
+			//
+			//
+			//
+			//                                         s[0]
+			//                       s[0]
+			//    s[0]   ---->               ---->     s[1]
+			//                       s[1]
+			//                                         s[2]
 			//
 
 
 			double* const discountedDividendAtTime = new double[n + 1];	// the discountedDividendValueAtSteps[0, 1, 2, ..., n]
-	
+
 			for (long k = 0; k <= n; k++) {
 				discountedDividendAtTime[k]  = .0;
 			}
-
-			
-
-			if (dividends != 0) {
-
-				for (std::vector<Dividend*>::iterator itr = dividends->begin() ; itr != dividends->end(); itr++) {
-				
-					Dividend* d = *itr;
-					double timeToExDiv = d->getTimeToExDiv();
-					if (timeToExDiv < timeToExpiry) {
-						double dividendAmount = d->getAmount();
-						long lastStepBeforeExDiv = (long) (timeToExDiv / deltaT);
-						for (long k = 0; k <= lastStepBeforeExDiv; k++) {
-							discountedDividendAtTime[k] += dividendAmount * exp(-continuousRate *( timeToExDiv - k * deltaT));
-						}
-
+			for (auto & d : dividends) {
+				double timeToExDiv = d.timeToExDiv;
+				if (timeToExDiv < timeToExpiry) {
+					double dividendAmount = d.amount;
+					long lastStepBeforeExDiv = static_cast<long>(timeToExDiv / deltaT);
+					for (long k = 0; k <= lastStepBeforeExDiv; k++) {
+						discountedDividendAtTime[k] += dividendAmount * exp(-continuousRate *( timeToExDiv - k * deltaT));
 					}
-					
-
 				}
-				
 			}
-
 
 			const double initialUnderlyingPriceExcludedDividend = initialUnderlyingPrice - discountedDividendAtTime[0];
 
@@ -114,7 +90,7 @@ namespace binomial_tree {
 			// at expiry (time t == n * deltaT), calcaulte the option at the tree-leaves
 			for (i = 0; i <= n; i++) {
 				s[i] = initialUnderlyingPriceExcludedDividend * pow(u, n - 2.0 * i);
-				
+
 				const double underlyingPriceAdjustedByDividend = s[i] + discountedDividendAtTime[n];
 
 				if (callPut == CALL) {
@@ -123,12 +99,6 @@ namespace binomial_tree {
 					o[i] = max(strikePrice - underlyingPriceAdjustedByDividend, .0);
 				}
 			}
-
-			
-		
-			
-
-
 
 			// backward process
 
@@ -163,22 +133,35 @@ namespace binomial_tree {
 
 
 
-	
+
 }
 int main(void) {
 	using namespace binomial_tree;
-	Dividend d1(2.06, 3.5/12.0);
-
 	vector<Dividend*> dividends;
-	dividends.push_back(&d1);
 
 	{
-		auto optionValue = computeValue(PUT, EUROPEAN, 52.0, 0.1, 2.5, &dividends, 0.40, 50, 5100);
+		auto optionValue = computeValue(PUT,
+			EUROPEAN,
+			52.0,
+			0.1,
+			2.5,
+			{{2.06, 3.5/12.0}},
+			0.40,
+			50,
+			5100);
 		cout << optionValue << endl;
 		assert(std::abs(6.324 - std::floor(optionValue*1000.0 + 0.5)/1000.0) < 1e-6);
 	}
 	{
-		auto optionValue = computeValue(PUT, AMERICAN, 52.0, 0.1, 2.5, &dividends, 0.40, 50, 5100);
+		auto optionValue = computeValue(PUT,
+			AMERICAN,
+			52.0,
+			0.1,
+			2.5,
+			{{2.06, 3.5/12.0}},
+			0.40,
+			50,
+			5100);
 		cout << optionValue << endl;
 		assert(std::abs(7.946 - std::floor(optionValue*1000.0 + 0.5)/1000.0) < 1e-6);
 	}
