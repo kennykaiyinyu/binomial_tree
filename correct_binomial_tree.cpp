@@ -166,28 +166,25 @@ namespace binomial_tree {
 	
 }
 int main(void) {
-	using namespace binomial_tree ;
-
-	CallPut callPut = PUT;
-	OptionStyle os = AMERICAN;
-	double initS = 52.0;
-	double r = .10;
-	double timeToExpiry = 2.5;
+	using namespace binomial_tree;
 	Dividend d1(2.06, 3.5/12.0);
-	//Dividend dividends[] = { d1 };
+
 	vector<Dividend*> dividends;
 	dividends.push_back(&d1);
-	
-	double vol = .40;
-	double strike = 50.0;
-	long n = (long) (timeToExpiry * 2040);
 
-	assert(n == 5100);
-	auto optionValue = std::floor(binomial_tree::computeValue(callPut, os, initS, r,timeToExpiry, &dividends, vol, strike, n) * 1000 + .5)/1000.0;
-	cout << optionValue << endl;
-	assert(std::abs(7.946 - optionValue) < 1e-6);
+	{
+		auto optionValue = computeValue(PUT, EUROPEAN, 52.0, 0.1, 2.5, &dividends, 0.40, 50, 5100);
+		cout << optionValue << endl;
+		assert(std::abs(6.324 - std::floor(optionValue*1000.0 + 0.5)/1000.0) < 1e-6);
+	}
+	{
+		auto optionValue = computeValue(PUT, AMERICAN, 52.0, 0.1, 2.5, &dividends, 0.40, 50, 5100);
+		cout << optionValue << endl;
+		assert(std::abs(7.946 - std::floor(optionValue*1000.0 + 0.5)/1000.0) < 1e-6);
+	}
 
-	cout << setprecision(4) << n <<"," << optionValue << endl;
+
+
 	
 
 }
