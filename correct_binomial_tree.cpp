@@ -4,6 +4,7 @@
 #include <iomanip>      // std::setprecision
 #include <vector>
 #include <cassert>
+#include <chrono>
 
 
 using namespace std;
@@ -19,6 +20,8 @@ using Dividend = dividends::Dividend;
 
 namespace binomial_tree {
 
+	static thread_local std::vector<double> memory_pool(1000000);
+
 	enum CallPut {CALL, PUT};
 	enum OptionStyle {EUROPEAN, AMERICAN};
 
@@ -28,17 +31,17 @@ namespace binomial_tree {
 		const double& initialUnderlyingPrice,
 		const double& continuousRate,
 		const double& timeToExpiry,
-		const vector<Dividend> dividends,
+		const vector<Dividend> & dividends,
 		const double& volatility,
 		double strikePrice,
 		long n /* steps */) {
 
 			if (callPut != CALL && callPut != PUT)  {
-				throw "must be call or put!";
+				throw runtime_error("must be call or put!");
 			}
 
 			if (optionStyle != EUROPEAN && optionStyle != AMERICAN)  {
-				throw "must be European or American!";
+				throw runtime_error("must be European or American!");
 			}
 
 			double deltaT = timeToExpiry / (.0 + n);
@@ -49,8 +52,13 @@ namespace binomial_tree {
 			double pu = (a - d) / (u - d);
 			double pd = 1 - pu;
 
-			double* const s = new double[n + 1];	// The tree leaves of the underlying (with dividend excluded)
-			double* const o = new double[n + 1];	// option values
+			if (memory_pool.size() < 3*n + 3) {
+				throw runtime_error("memory pool must be at least 3 * n + 3");
+			}
+
+			double* const s = &memory_pool[0];	// The tree leaves of the underlying (with dividend excluded)
+			double* const o = &memory_pool[n + 1];	// option values
+			double* const discountedDividendAtTime = &memory_pool[2*n+2]; // the discountedDividendValueAtSteps[0, 1, 2, ..., n]
 
 			//
 			// Forward process
@@ -65,9 +73,6 @@ namespace binomial_tree {
 			//                       s[1]
 			//                                         s[2]
 			//
-
-
-			double* const discountedDividendAtTime = new double[n + 1];	// the discountedDividendValueAtSteps[0, 1, 2, ..., n]
 
 			for (long k = 0; k <= n; k++) {
 				discountedDividendAtTime[k]  = .0;
@@ -123,10 +128,6 @@ namespace binomial_tree {
 			}
 
 			double optionValue = o[0];
-			delete[] s;
-			delete[] o;
-			delete[] discountedDividendAtTime;
-
 			return optionValue;
 
 		}
@@ -164,6 +165,55 @@ int main(void) {
 			5100);
 		cout << optionValue << endl;
 		assert(std::abs(7.946 - std::floor(optionValue*1000.0 + 0.5)/1000.0) < 1e-6);
+	}
+	vector<int> step_sizes = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600, 1800, 2000};
+	{
+
+		std::cout << std::left << std::setw(10) << "Steps (N)"
+					  << std::setw(15) << "Price"
+					  << std::setw(15) << "Latency (ms)" << std::endl;
+		std::cout << std::string(40, '-') << std::endl;
+		for (auto & step_size :step_sizes) {
+			auto start = std::chrono::high_resolution_clock::now();
+			auto optionValue = computeValue(CALL,
+				EUROPEAN,
+				259.48,
+				0.0362,
+				0.3726,
+				{{0.25, 0.0301}, {0.25, 0.2795}},
+				0.215,
+				280,
+				step_size);
+			auto end = std::chrono::high_resolution_clock::now();
+			std::chrono::duration<double, std::milli> ms = end - start;
+			std::cout << std::left << std::setw(10) << step_size
+			  << std::setw(15) << std::fixed << std::setprecision(6) << optionValue
+			  << std::setw(15) << ms.count() << std::endl;
+		}
+	}
+	{
+
+		std::cout << std::left << std::setw(10) << "Steps (N)"
+					  << std::setw(15) << "Price"
+					  << std::setw(15) << "Latency (ms)" << std::endl;
+		std::cout << std::string(40, '-') << std::endl;
+		for (auto & step_size :step_sizes) {
+			auto start = std::chrono::high_resolution_clock::now();
+			auto optionValue = computeValue(CALL,
+				AMERICAN,
+				259.48,
+				0.0362,
+				0.3726,
+				{{0.25, 0.0301}, {0.25, 0.2795}},
+				0.215,
+				280,
+				step_size);
+			auto end = std::chrono::high_resolution_clock::now();
+			std::chrono::duration<double, std::milli> ms = end - start;
+			std::cout << std::left << std::setw(10) << step_size
+			  << std::setw(15) << std::fixed << std::setprecision(6) << optionValue
+			  << std::setw(15) << ms.count() << std::endl;
+		}
 	}
 
 
