@@ -2,46 +2,90 @@
 #include <vector>
 #include <iomanip>
 #include <chrono>
+#include <mutex>
 #include "binomial_tree.h"
-#include "Dividend.h"
 
 int main() {
-    using namespace binomial_tree;
-    using dividends::Dividend;
+	using namespace binomial_tree;
+	vector<Dividend*> dividends;
 
-    // Parameters for testing
-    CallPut cp = PUT;
-    OptionStyle style = AMERICAN;
-    double spot = 235.50;
-    double rate = 0.0042;
-    double expiry = 0.5;
-    double vol = .25;
-    double strike = 235.00;
+	// European Stock A put
+	{
+		auto optionValue = computeValue<PUT,EUROPEAN>(
+			52.0,
+			0.1,
+			0.5,
+			{{2.06, 3.5/12.0}},
+			0.40,
+			50,
+			5100);
+		cout << optionValue << endl;
+	}
+	// American Stock A put
+	{
+		auto optionValue = computeValue<PUT,AMERICAN>(
+			52.0,
+			0.1,
+			0.5,
+			{{2.06, 3.5/12.0}},
+			0.40,
+			50,
+			5100);
+		cout << optionValue << endl;
+	}
 
-    Dividend d1{0.25, 0.25};
-    std::vector<Dividend*> divs;
-    divs.push_back(&d1);
+	// convergency test for AAPL Call
 
-    // Steps to test for convergence
-    std::vector<long> test_steps = {100, 500, 1000, 5000, 10000, 20000};
+	vector<int> step_sizes = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 15, 20, 30, 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1200, 1400, 1600, 1800, 2000};
+	{
 
-    std::cout << std::left << std::setw(10) << "Steps (N)"
-              << std::setw(15) << "Price"
-              << std::setw(15) << "Latency (ms)" << std::endl;
-    std::cout << std::string(40, '-') << std::endl;
+		std::cout << std::left << std::setw(10) << "Steps (N)"
+					  << std::setw(15) << "Price"
+					  << std::setw(15) << "Latency (ms)" << std::endl;
+		std::cout << std::string(40, '-') << std::endl;
+		for (auto & step_size :step_sizes) {
+			auto start = std::chrono::high_resolution_clock::now();
+			auto optionValue = computeValue<CALL,EUROPEAN>(
+				259.48,
+				0.0362,
+				0.3726,
+				{{0.25, 0.0301}, {0.25, 0.2795}},
+				0.215,
+				280,
+				step_size);
+			auto end = std::chrono::high_resolution_clock::now();
+			std::chrono::duration<double, std::milli> ms = end - start;
+			std::cout << std::left << std::setw(10) << step_size
+			  << std::setw(15) << std::fixed << std::setprecision(6) << optionValue
+			  << std::setw(15) << ms.count() << std::endl;
+		}
+	}
+	{
 
-    for (long n : test_steps) {
-        auto start = std::chrono::high_resolution_clock::now();
+		std::cout << std::left << std::setw(10) << "Steps (N)"
+					  << std::setw(15) << "Price"
+					  << std::setw(15) << "Latency (ms)" << std::endl;
+		std::cout << std::string(40, '-') << std::endl;
+		for (auto & step_size :step_sizes) {
+			auto start = std::chrono::high_resolution_clock::now();
+			auto optionValue = computeValue<CALL,AMERICAN>(
+				259.48,
+				0.0362,
+				0.3726,
+				{{0.25, 0.0301}, {0.25, 0.2795}},
+				0.215,
+				280,
+				step_size);
+			auto end = std::chrono::high_resolution_clock::now();
+			std::chrono::duration<double, std::milli> ms = end - start;
+			std::cout << std::left << std::setw(10) << step_size
+			  << std::setw(15) << std::fixed << std::setprecision(6) << optionValue
+			  << std::setw(15) << ms.count() << std::endl;
+		}
+	}
 
-        double price = computeValue(cp, style, spot, rate, expiry, &divs, vol, strike, n);
 
-        auto end = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double, std::milli> ms = end - start;
 
-        std::cout << std::left << std::setw(10) << n
-                  << std::setw(15) << std::fixed << std::setprecision(6) << price
-                  << std::setw(15) << ms.count() << std::endl;
-    }
 
-    return 0;
+
 }
